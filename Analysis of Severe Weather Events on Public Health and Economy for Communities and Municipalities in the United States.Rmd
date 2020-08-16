@@ -86,5 +86,55 @@ event_data$Event[grep(pattern = "TORNADO", x = event_data$EVTYPE, ignore.case = 
 event_data$Event[grep(pattern = "LIGHTNING", x = event_data$EVTYPE, ignore.case = TRUE)] <- "LIGHTNING"
 event_data$Event[grep(pattern = "RAIN", x = event_data$EVTYPE, ignore.case = TRUE)] <- "RAIN"
 
+# Sorting on the new grouped event types
+
+sort(table(event_data$Event), decreasing = TRUE)
+
 ```
 
+As seen by the sorting above, it is now clear that most of the severe weather events were contributed by WIND and HAIL type events
+
+Next, lets analyze the dollar unit values for any inconsistencies
+
+```{r lookingatunits, echo = TRUE}
+
+sort(table(event_data$PROPDMGEXP), decreasing = TRUE)[1:10]
+
+sort(table(event_data$CROPDMGEXP), decreasing = TRUE)[1:10]
+```
+
+There seems to be some inconsistencies in the units. So we can transform those variables in one unit (dollar) variable using the following rules:
+* K or k: thousand dollars (10^3)
+* M or m: million dollars (10^6)
+* B or b: billion dollars (10^9)
+* The rest would be considered as dollars
+
+The new variables are a product of damage value and dollar unit
+
+```{r cleanupunits, echo = TRUE}
+event_data$PROPDMGEXP[is.na(event_data$PROPDMGEXP)] <- "0" #NA's considered as unit dollars
+event_data$PROPDMGEXP[!grep("K|M|B",x = event_data$PROPDMGEXP, ignore.case = TRUE)] <- "0" #Anything other than K,M,B are considered unit dollars
+event_data$PROPDMGEXP[grep("K", x = event_data$PROPDMGEXP, ignore.case = TRUE)] <- "3"
+event_data$PROPDMGEXP[grep("M", x = event_data$PROPDMGEXP,ignore.case = TRUE)] <- "6"
+event_data$PROPDMGEXP[grep("B", x = event_data$PROPDMGEXP,ignore.case = TRUE)] <- "9"
+
+#Convert unit field to numeric
+event_data$PROPDMGEXP <- as.numeric(event_data$PROPDMGEXP)
+
+#Creating a new variable Property damage that would be the product of the dollar value and the unit
+event_data$Property_Damage <- event_data$PROPDMG * 10^event_data$PROPDMGEXP
+
+#Doing the same with crop damage
+event_data$CROPDMGEXP[is.na(event_data$CROPDMGEXP)] <- "0" #NA's considered as unit dollars
+event_data$CROPDMGEXP[!grep("K|M|B", x = event_data$CROPDMGEXP, ignore.case = TRUE)] <- "0" #Anything other than K,M,B are considered unit dollars
+event_data$CROPDMGEXP[grep("K", x = event_data$CROPDMGEXP, ignore.case = TRUE)] <- "3"
+event_data$CROPDMGEXP[grep("M", x = event_data$CROPDMGEXP,ignore.case = TRUE)] <- "6"
+event_data$CROPDMGEXP[grep("B", x = event_data$CROPDMGEXP,ignore.case = TRUE)] <- "9"
+
+#Convert unit field to numeric
+event_data$CROPDMGEXP <- as.numeric(event_data$CROPDMGEXP)
+
+#Creating a new variable Crop damage that would be the product of the dollar value and the unit
+event_data$Crop_Damage <- event_data$CROPDMG * 10^event_data$CROPDMGEXP
+
+```
