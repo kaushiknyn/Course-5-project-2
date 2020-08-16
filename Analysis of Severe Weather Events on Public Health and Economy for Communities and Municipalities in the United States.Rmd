@@ -1,0 +1,90 @@
+---
+title: Analysis of Severe Weather Events on Public Health and Economy for Communities
+  and Municipalities in the United States
+author: "Kaushik Sivasankaran"
+date: "8/16/2020"
+output: html_document
+---
+## Synopsis
+
+Storms and other severe events can cause both public health and economic problems for communities and municipalities in the United States of America. This analysis involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database to determine which types of severe events are most harmful to population health and have the greatest adverse econmic impact in the United States. This analysis will use a database that comprises details of severe weather events from 1950 ranging till November 2011.
+
+## Data Processing
+
+First, the data required to perform the analysis needs to be extracted.
+
+After downloading the data from the course project website into the R project directory, the next step is to read in the *csv.bz2* zip file.
+
+```{r readfile, echo = TRUE}
+
+storm_data <- read.csv(file = "repdata_data_StormData.csv.bz2", header = TRUE, sep = ",", as.is = TRUE)
+
+```
+Next, there seems to be 2 date-time fields BGN_DATE and BGN_TIME that are imported as character data types and need to be converted to the correct data types
+
+``` {r converttodatetime, echo = TRUE}
+
+
+#Converting BGN_DATE and END_DATE to date format
+
+storm_data$BGN_DATE <- as.Date(storm_data$BGN_DATE, format = "%m/%d/%Y")
+
+storm_data$END_DATE <- as.Date(storm_data$END_DATE, format = "%m/%d/%Y")
+
+#Converting BGN_TIME and END_TIME to time format
+
+storm_data$BGN_TIME <- strptime(x = paste(storm_data$BGN_DATE, storm_data$BGN_TIME, sep = ""), format = "%Y-%m-%d %I%M")
+
+storm_data$END_TIME <- strptime(x = paste(storm_data$END_DATE, storm_data$END_TIME, sep = ""), format = "%Y-%m-%d %I%M")
+
+
+```
+
+### Extracting the required data
+In order to calculate the event types that are most harmful with respect to population health and economic impact, we would need to extract following data:
+
+1. EVETYPE - Event type (Ex: Tornado, Blizzard, etc.)
+2. Health related impacts:
+  a. Fatalities - Number of deaths caused by severe events
+  b. Injuries - Number of injuries caused by severe events
+3. Economic related impacts:
+  a. PROPDMG - Property related damage
+  b. PROPDMGEXP - The unit for property damage by value
+  c. CROPDMG - Crop related damage
+  d. CROPDMGEXP - The unit for crop damage by value
+  
+```{r extractdata, echo = TRUE}
+#Loading the dplyr package
+library(dplyr)
+
+#Extracting only relevant data from storms data
+event_data <- storm_data[, c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+
+# Checking for NA values in the new dataframe
+
+sum(is.na(event_data))
+
+#Sorting the data by event type to identify the top 10 event types
+
+sort(table(event_data$EVTYPE),decreasing = TRUE)[1:10]
+
+```
+Now in order to identify the event type better, we will group event types with common words as one event type. For example, TSTM WIND, THUNDERSTORM WIND, etc., will be classified as event type WIND and unclassifiable event types as OTHER
+
+``` {r combiningeventtype, echo = TRUE}
+# Creating a new variable to store the combined event type
+event_data$Event <- "OTHER"
+
+#Group by keyword in event type
+event_data$Event[grep(pattern = "HAIL", x = event_data$EVTYPE, ignore.case = TRUE)] <- "HAIL"
+event_data$Event[grep(pattern = "WIND", x = event_data$EVTYPE, ignore.case = TRUE)] <- "WIND"
+event_data$Event[grep(pattern = "SNOW", x = event_data$EVTYPE, ignore.case = TRUE)] <- "SNOW"
+event_data$Event[grep(pattern = "FLOOD", x = event_data$EVTYPE, ignore.case = TRUE)] <- "FLOOD"
+event_data$Event[grep(pattern = "HAIL", x = event_data$EVTYPE, ignore.case = TRUE)] <- "HAIL"
+event_data$Event[grep(pattern = "RAIN", x = event_data$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+event_data$Event[grep(pattern = "TORNADO", x = event_data$EVTYPE, ignore.case = TRUE)] <- "TORNADO"
+event_data$Event[grep(pattern = "LIGHTNING", x = event_data$EVTYPE, ignore.case = TRUE)] <- "LIGHTNING"
+event_data$Event[grep(pattern = "RAIN", x = event_data$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+
+```
+
