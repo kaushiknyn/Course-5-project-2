@@ -3,7 +3,9 @@ title: Analysis of Severe Weather Events on Public Health and Economy for Commun
   and Municipalities in the United States
 author: "Kaushik Sivasankaran"
 date: "8/16/2020"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 ## Synopsis
 
@@ -20,42 +22,21 @@ After downloading the data from the course project website into the R project di
 storm_data <- read.csv(file = "repdata_data_StormData.csv.bz2", header = TRUE, sep = ",", as.is = TRUE)
 
 ```
-Next, there seems to be 2 date-time fields BGN_DATE and BGN_TIME that are imported as character data types and need to be converted to the correct data types
-
-``` {r converttodatetime, echo = TRUE}
-
-
-#Converting BGN_DATE and END_DATE to date format
-
-storm_data$BGN_DATE <- as.Date(storm_data$BGN_DATE, format = "%m/%d/%Y")
-
-storm_data$END_DATE <- as.Date(storm_data$END_DATE, format = "%m/%d/%Y")
-
-#Converting BGN_TIME and END_TIME to time format
-
-storm_data$BGN_TIME <- strptime(x = paste(storm_data$BGN_DATE, storm_data$BGN_TIME, sep = ""), format = "%Y-%m-%d %I%M")
-
-storm_data$END_TIME <- strptime(x = paste(storm_data$END_DATE, storm_data$END_TIME, sep = ""), format = "%Y-%m-%d %I%M")
-
-
-```
 
 ### Extracting the required data
 In order to calculate the event types that are most harmful with respect to population health and economic impact, we would need to extract following data:
 
-1. EVETYPE - Event type (Ex: Tornado, Blizzard, etc.)
-2. Health related impacts:
-  a. Fatalities - Number of deaths caused by severe events
-  b. Injuries - Number of injuries caused by severe events
-3. Economic related impacts:
-  a. PROPDMG - Property related damage
-  b. PROPDMGEXP - The unit for property damage by value
-  c. CROPDMG - Crop related damage
-  d. CROPDMGEXP - The unit for crop damage by value
+* EVETYPE - Event type (Ex: Tornado, Blizzard, etc.)
+* Health related impacts:
+  1. Fatalities - Number of deaths caused by severe events
+  2. Injuries - Number of injuries caused by severe events
+* Economic related impacts:
+  1. PROPDMG - Property related damage
+  2. PROPDMGEXP - The unit for property damage by value
+  3. CROPDMG - Crop related damage
+  4. CROPDMGEXP - The unit for crop damage by value
   
 ```{r extractdata, echo = TRUE}
-#Loading the dplyr package
-library(dplyr)
 
 #Extracting only relevant data from storms data
 event_data <- storm_data[, c("EVTYPE", "FATALITIES", "INJURIES", "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
@@ -85,6 +66,8 @@ event_data$Event[grep(pattern = "RAIN", x = event_data$EVTYPE, ignore.case = TRU
 event_data$Event[grep(pattern = "TORNADO", x = event_data$EVTYPE, ignore.case = TRUE)] <- "TORNADO"
 event_data$Event[grep(pattern = "LIGHTNING", x = event_data$EVTYPE, ignore.case = TRUE)] <- "LIGHTNING"
 event_data$Event[grep(pattern = "RAIN", x = event_data$EVTYPE, ignore.case = TRUE)] <- "RAIN"
+event_data$Event[grep(pattern = "HEAT", x = event_data$EVTYPE, ignore.case = TRUE)] <- "HEAT"
+event_data$Event[grep(pattern = "STORM", x = event_data$EVTYPE, ignore.case = TRUE)] <- "STORM"
 
 # Sorting on the new grouped event types
 
@@ -112,10 +95,15 @@ There seems to be some inconsistencies in the units. So we can transform those v
 The new variables are a product of damage value and dollar unit
 
 ```{r cleanupunits, echo = TRUE}
+
 event_data$PROPDMGEXP[is.na(event_data$PROPDMGEXP)] <- "0" #NA's considered as unit dollars
+
 event_data$PROPDMGEXP[!grep("K|M|B",x = event_data$PROPDMGEXP, ignore.case = TRUE)] <- "0" #Anything other than K,M,B are considered unit dollars
+
 event_data$PROPDMGEXP[grep("K", x = event_data$PROPDMGEXP, ignore.case = TRUE)] <- "3"
+
 event_data$PROPDMGEXP[grep("M", x = event_data$PROPDMGEXP,ignore.case = TRUE)] <- "6"
+
 event_data$PROPDMGEXP[grep("B", x = event_data$PROPDMGEXP,ignore.case = TRUE)] <- "9"
 
 #Convert unit field to numeric
@@ -126,9 +114,13 @@ event_data$Property_Damage <- event_data$PROPDMG * 10^event_data$PROPDMGEXP
 
 #Doing the same with crop damage
 event_data$CROPDMGEXP[is.na(event_data$CROPDMGEXP)] <- "0" #NA's considered as unit dollars
+
 event_data$CROPDMGEXP[!grep("K|M|B", x = event_data$CROPDMGEXP, ignore.case = TRUE)] <- "0" #Anything other than K,M,B are considered unit dollars
+
 event_data$CROPDMGEXP[grep("K", x = event_data$CROPDMGEXP, ignore.case = TRUE)] <- "3"
+
 event_data$CROPDMGEXP[grep("M", x = event_data$CROPDMGEXP,ignore.case = TRUE)] <- "6"
+
 event_data$CROPDMGEXP[grep("B", x = event_data$CROPDMGEXP,ignore.case = TRUE)] <- "9"
 
 #Convert unit field to numeric
@@ -138,3 +130,43 @@ event_data$CROPDMGEXP <- as.numeric(event_data$CROPDMGEXP)
 event_data$Crop_Damage <- event_data$CROPDMG * 10^event_data$CROPDMGEXP
 
 ```
+
+## Analysis
+
+### Aggregating health related impacts by event type
+
+```{r aggforhealth, echo=TRUE}
+# Loading the dplyr package
+library(dplyr)
+
+# Creating a new data frame for aggregated health values (Fatalities + Injuries)
+
+event_type_health_total <- event_data %>% group_by(Event) %>% summarise(impact_on_public_health = sum(FATALITIES, INJURIES, na.rm = TRUE))
+
+
+# Creating another data frame for aggregated economic impact (property + crop damage) values by event type
+
+event_type_economy <- event_data %>% group_by(Event) %>% summarise(impact_on_economy = sum(Property_Damage, Crop_Damage, na.rm = TRUE))
+
+```
+
+## Result
+
+Finally, we can create histogram plots to show the severe weather event(s) that contribute to the most adverse impact on health and ecnomoy.
+
+```{r histhealth, echo = TRUE}
+# Loading the ggplot2 package
+library(ggplot2)
+
+# Plot for health impact
+ggplot(data = event_type_health_total, aes(y = Event, x = impact_on_public_health, fill = Event)) + geom_bar(stat = "identity") + xlab("Total Impact on Public Health") + ylab("Event Type") + ggtitle("Impact of Severe Weather Events on Public Health")
+
+# Plot for economic impact
+ggplot(data = event_type_economy, aes(y = Event, x = impact_on_economy, fill = Event)) + geom_bar(stat = "identity") + xlab("Total Impact on Economy") + ylab("Event Type") + ggtitle("Impact of Severe Weather Events on Economy")
+
+
+```
+
+## Summary
+
+Based on the results of the bar plots, the highest severe weather events that adversly impacts public health are **Tornados** and the economy are **Floods**.
